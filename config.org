@@ -138,7 +138,7 @@ https://gist.github.com/ethan-leba/760054f36a2f7c144c6b06ab6458fae6
 (defun aerospace-window-down ()
   (interactive)
   (aerospace-move-on-error "down" #'windmove-down))
-#+begin_src emacs-lisp
+#+end_src
 
 ** yabai (i3-like window management)
 #+begin_src emacs-lisp
