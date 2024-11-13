@@ -1,0 +1,304 @@
+#+STARTUP: overview
+#+VISIBILITY: folded
+#+begin_src emacs-lisp
+(setq
+     bookmark-save-flag 1
+     doom-font (font-spec :family "Menlo" :size 14 :weight 'medium)
+     doom-theme 'doom-tomorrow-night
+)
+(set-frame-parameter (selected-frame) 'alpha '(97 . 93))
+#+end_src
+
+* keymap
+#+begin_src emacs-lisp
+(custom-set-variables
+    '(ns-control-modifier 'meta)
+    '(ns-command-modifier 'control)
+)
+(setq aw-keys '(?n ?e ?i ?o ?m ?u ?y))
+(setq-default evil-escape-key-sequence "ii")
+(setq-default evil-escape-delay 0.2)
+(setq evil-snipe-scope 'buffer)
+(defvar toggle-window-maximization t)
+(map! :nv "C-M-d"        #'+multiple-cursors/evil-mc-toggle-cursor-here) ;; dumb, but it is what it is
+(map! :gnv
+      ;; num row
+      "C-M-1"            #'+workspace/switch-to-0
+      "C-M-2"            #'+workspace/switch-to-1
+      "C-M-3"            #'+workspace/switch-to-2
+      "C-M-4"            #'+workspace/switch-to-3
+      "C-M-5"            #'+workspace/switch-to-4
+      "C-M-6"            #'+workspace/switch-to-5
+      "C-M-7"            #'+workspace/switch-to-6
+      "C-M-8"            #'+workspace:switch-previous
+      "C-M-9"            #'+workspace:switch-next
+      "C-M-0"            #'+workspace/delete
+      ;; top row
+      "C-M-q"            #'+workspace/close-window-or-workspace
+      "C-M-w"            #'+goto-previous-function.outer
+      "C-M-S-w"          #'+goto-previous-class.outer
+      "C-M-f"            #'save-buffer
+      "C-M-S-f"          #'avy-goto-char-timer
+      "C-M-p"            #'scroll-other-window
+      "C-M-g"            #'magit-status ;; g
+
+      "C-M-j"            #'+default/diagnostics
+      "C-M-S-j"          #'lsp-execute-code-action
+      "C-M-l"            #'+lookup/definition
+      "C-M-S-l"          #'lsp-rust-find-parent-module
+      "C-M-u"            #'+lookup/references
+      "C-M-S-u"          #'lsp-rust-analyzer-related-tests
+      "C-M-y"            #'consult-imenu-multi
+      "C-M-S-y"          #'lsp-ui-imenu
+      "C-M-;"            #'lsp-ui-peek--goto-xref-other-window
+      "C-M-:"            #'lsp-rust-analyzer-open-external-docs
+      ;; mid row
+      "C-M-r"            #'+goto-function.outer
+      "C-M-S-r"          #'+goto-class.outer
+      "C-M-S-s"            #'gptel-send
+      ;; "C-M-S-s"          #'gptel-menu
+      "C-M-t"            #'scroll-other-window-down
+      "C-M-d"            #'+multiple-cursors/evil-mc-toggle-cursor-here
+
+      "M-n"              #'yabai-window-left
+      "M-e"              #'yabai-window-down
+      "M-i"              #'yabai-window-up
+      "M-o"              #'yabai-window-right
+      ;; bottom row
+      "C-M-v"            #'lsp-extend-selection
+      "C-M-b"            #'ranger
+
+      "C-M-k"            #'kill-current-buffer
+      "M-RET"            (λ! (if toggle-window-maximization ;; C-M-m, for some reason registered as M-RET
+                               (progn (evil-resize-window (- (frame-width) 1) t)
+                                      (evil-resize-window (- (frame-width) 1) nil))
+                               (balance-windows))
+                             (setq toggle-window-maximization (not toggle-window-maximization)))
+      "C-M-,"            #'previous-buffer
+      "C-M-/"            #'next-buffer
+      ;; thumbs
+      "C-M-S-v"          #'+vterm/toggle
+      "C-M-_"            #'powerthesaurus-hydra/body
+)
+(defhydra +hydra/window-nav (:hint nil) "resize window: _o_:increase width  _n_:decrease width  _i_:increase height  _e_:decrease height _q_:quit"
+    ("o" evil-window-increase-width)
+    ("n" evil-window-decrease-width)
+    ("i" evil-window-increase-height)
+    ("e" evil-window-decrease-height)
+    ("q" nil))
+(map! :map markdown-mode-map :niv
+      "C-M-S-v"          #'+vterm/toggle
+      "M-n"              #'aerospace-window-left
+      "M-e"              #'aerospace-window-down
+      "M-i"              #'aerospace-window-up
+      "M-o"              #'aerospace-window-right
+      "M-RET"            (λ! (if toggle-window-maximization
+                               (progn (evil-resize-window (- (frame-width) 1) t)
+                                      (evil-resize-window (- (frame-width) 1) nil))
+                               (balance-windows))
+                             (setq toggle-window-maximization (not toggle-window-maximization))))
+(map! :map vterm-mode-map :niv
+      "C-M-S-v"          #'+vterm/toggle
+      "M-n"              #'aerospace-window-left
+      "M-e"              #'aerospace-window-down
+      "M-i"              #'aerospace-window-up
+      "M-o"              #'aerospace-window-right
+      "M-RET"            (λ! (if toggle-window-maximization
+                               (progn (evil-resize-window (- (frame-width) 1) t)
+                                      (evil-resize-window (- (frame-width) 1) nil))
+                               (balance-windows))
+                             (setq toggle-window-maximization (not toggle-window-maximization))))
+(map! :map smerge-mode-map :nv
+      "n"             #'smerge-prev
+      "e"             #'smerge-keep-lower
+      "i"             #'smerge-keep-upper
+      "o"             #'smerge-next)
+#+end_src
+
+#+RESULTS:
+
+* packages
+** aerospace (i3-like window management)
+https://gist.github.com/ethan-leba/760054f36a2f7c144c6b06ab6458fae6
+#+begin_src emacs-lisp
+(defun aerospace-move-on-error (direction move-fn)
+  (interactive)
+  (condition-case nil
+      (funcall move-fn)
+    (user-error (start-process "aerospace" nil "aerospace" "focus" direction))))
+(defun aerospace-window-left ()
+  (interactive)
+  (aerospace-move-on-error "left" #'windmove-left))
+(defun aerospace-window-right ()
+  (interactive)
+  (aerospace-move-on-error "right" #'windmove-right))
+(defun aerospace-window-up ()
+  (interactive)
+  (aerospace-move-on-error "up" #'windmove-up))
+(defun aerospace-window-down ()
+  (interactive)
+  (aerospace-move-on-error "down" #'windmove-down))
+#+begin_src emacs-lisp
+
+** yabai (i3-like window management)
+#+begin_src emacs-lisp
+(defun yabai-move-on-error (direction move-fn)
+  (interactive)
+  (condition-case nil
+      (funcall move-fn)
+    (user-error (start-process "yabai" nil "yabai" "-m" "window" "--focus" direction))))
+(defun yabai-window-left ()
+  (interactive)
+  (yabai-move-on-error "west" #'windmove-left))
+(defun yabai-window-right ()
+  (interactive)
+  (yabai-move-on-error "east" #'windmove-right))
+(defun yabai-window-up ()
+  (interactive)
+  (yabai-move-on-error "north" #'windmove-up))
+(defun yabai-window-down ()
+  (interactive)
+  (yabai-move-on-error "south" #'windmove-down))
+#+end_src
+
+** copilot
+#+begin_src emacs-lisp
+(use-package! copilot
+ :hook (prog-mode . copilot-mode)
+ :bind (("C-TAB" . 'copilot-accept-completion-by-word)
+        ("C-<tab>" . 'copilot-accept-completion-by-word)
+        :map copilot-completion-map
+        ("<tab>" . 'copilot-accept-completion)
+        ("TAB" . 'copilot-accept-completion)))
+#+end_src
+
+** git-link
+#+begin_src emacs-lisp
+(use-package! git-link)
+#+end_src
+
+** gptel
+#+begin_src emacs-lisp
+(use-package! gptel
+ :config
+ (setq! gptel-api-key "sk-proj-...")
+ (setq! gptel-model "gpt-4o-minI")
+ (setq  gptel-directives '((default . "You are a large language model living in Emacs and a helpful coding assistant. Respond concisely.")
+                         (rust . "You are expert coder, staff software engineer in fintech company. You are expert at rust, concurrency, multithreading, and async code.")
+                         )))
+#+end_src
+
+** gpt-ai
+#+begin_src emacs-lisp
+(use-package org-ai
+  :ensure t
+  :commands (org-ai-mode
+             org-ai-global-mode)
+  :init
+  (add-hook 'org-mode-hook #'org-ai-mode) ; enable org-ai in org-mode
+  (org-ai-global-mode) ; installs global keybindings on C-c M-a
+  :config
+  (setq org-ai-default-chat-model "gpt-4-1106-preview") ;
+  (org-ai-install-yasnippets)) 
+#+end_src
+
+** json5
+#+begin_src emacs-lisp
+(use-package! json5)
+#+end_src
+
+** lsp
+- https://robert.kra.hn/posts/2021-02-07_rust-with-emacs/#debugging
+- https://rust-analyzer.github.io/manual.html#emacs
+- https://emacs-lsp.github.io/lsp-mode/page/lsp-rust-analyzer/
+- https://www.reddit.com/r/emacs/comments/gocrlq/i_really_dont_understand_why_lspui_shows/
+- https://www.reddit.com/r/emacs/comments/i7q3ne/lspuidoc_documentation_with_company/
+- https://emacs.stackexchange.com/questions/19418/get-a-reference-for-the-current-frame
+#+begin_src emacs-lisp
+(setq lsp-rust-analyzer-inlay-hints-mode t)
+(setq lsp-rust-analyzer-server-display-inlay-hints t)
+(setq lsp-ui-sideline-enable nil)
+(setq lsp-ui-sideline-show-hover nil)
+(setq lsp-ui-peek-always-show t)
+#+end_src
+
+** magit-todos
+#+begin_src emacs-lisp
+(setq magit-todos-mode nil)
+(setq! magit-todos-mode nil)
+(setq! magit-todos-mode 'nil)
+#+end_src
+
+** mermaid-mode
+#+begin_src emacs-lisp
+(use-package! mermaid-mode)
+#+end_src
+
+** mini-modeline
+#+begin_src emacs-lisp
+(use-package! mini-modeline
+  :after smart-mode-line
+  :config
+  (mini-modeline-mode t))
+#+end_src
+
+** ob-mermaid
+#+begin_src emacs-lisp
+(use-package! ob-mermaid
+  :config
+  (setq ob-mermaid-cli-path "/Users/m/.nvm/versions/node/v16.15.0/bin/mmdc")
+  (org-babel-do-load-languages 'org-babel-load-languages
+                              (append org-babel-load-languages
+                              '((mermaid . t)))))
+#+end_src
+
+** powerthesaurus
+#+begin_src emacs-lisp
+(use-package! powerthesaurus)
+#+end_src
+
+** projectile
+#+begin_src emacs-lisp
+(setq projectile-project-search-path '("~/Desktop/"))
+#+end_src
+
+** rustic
+#+begin_src emacs-lisp
+(use-package! rustic
+  :config
+  (setq lsp-rust-server 'rust-analyzer)
+  (setq rustic-clippy-arguments "--verbose --tests --benches -- -D clippy::all")
+  (setq rustic-lsp-server 'rust-analyzer))
+  (after! lsp-mode
+    (setq lsp-inlay-hint-enable t)
+    (setq lsp-auto-guess-root nil))
+#+end_src
+
+** string-inflection
+#+begin_src emacs-lisp
+(use-package! string-inflection
+  :config
+  (map! :n "g C" #'string-inflection-all-cycle)
+)
+#+end_src
+
+** switch-window
+#+begin_src emacs-lisp
+(use-package! switch-window
+  :config
+  (setq switch-window-qwerty-shortcuts '("n" "e" "i" "o" "m" "u" "r")))
+#+end_src
+
+** vc-msg
+#+begin_src emacs-lisp
+(use-package! vc-msg)
+#+end_src
+
+** which-key
+#+begin_src emacs-lisp
+(use-package! which-key
+    :config
+    (setq which-key-idle-delay 0))
+#+end_src
+
+
